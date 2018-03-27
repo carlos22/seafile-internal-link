@@ -1,0 +1,106 @@
+#!/bin/bash
+
+if [ -d ~/Seafile/.seafile-data ]
+then
+    SEAFILE_CONF=~/Seafile/.seafile-data
+elif [ `which find`]
+then
+    SEAFILE_CONF=$(find $HOME -type d -name '.seafile-data' | head -n 1)
+elif [ `which locate` ]
+then
+    # if not in default place, search with locate (if locate is available)
+    SEAFILE_CONF=$(locate /*/.seafile-data)
+fi
+if [ -z "$SEAFILE_CONF" ] || [ ! -d "$SEAFILE_CONF" ]
+then
+    echo "Error: Could not find Seafile configuration" >&2
+    exit 2
+fi
+
+function sql_lookup {
+    DB="$1"; SQL="$2"
+    sqlite3 $1 <<-EOF
+	.separator ' '
+	$SQL
+	EOF
+}
+
+if [ -z "$1" -o "$2" ]
+then
+    echo "Usage: `basename $0` filename|dirname" >&2
+    exit 1
+fi
+
+[ -r "$1" ] || [ -d "$1" ] || { echo "Error: file or directory '$1' not found" >&2; exit 1; }
+CANON=`readlink -f "$1"`
+FILE_NAME=`basename "$CANON"`
+DIR_NAME=`dirname "$CANON"`
+if [ -d "$CANON" ]
+then
+    FILE_OR_DIR='d'
+else
+    FILE_OR_DIR='f'
+fi
+
+
+# find repo:
+ACCOUNT_INFO=$(
+    sql_lookup "$SEAFILE_CONF/repo.db" "select repo_id, value from RepoProperty where key='worktree';" |
+	while
+	    read repo folder
+	do
+	    if [[ "$DIR_NAME" =~ ^$folder ]]
+	    then
+		# Found it!
+		# First lets calculate the "path": The relative path *within* the repo
+		path=$( sed "s#$folder##" <<< $DIR_NAME )
+		# Now find server url and account info from repo
+		url=$(
+		    sql_lookup "$SEAFILE_CONF/repo.db" \
+			"select value from RepoProperty where repo_id='$repo' and key = 'server-url';"
+		)
+		email=$(
+		    sql_lookup "$SEAFILE_CONF/repo.db" \
+			"select value from RepoProperty where repo_id='$repo' and key = 'email';"
+		)
+		# now we can find the access-token in the accounts.db
+		token=$(
+		    sql_lookup "$SEAFILE_CONF/accounts.db" \
+			"select token from accounts where username='$email' and url='$url';"
+		)
+		#---
+		echo $repo $token $url $path
+		break
+	    fi
+	done
+)
+
+if [ -z "$ACCOUNT_INFO" ]
+then
+    echo "Error: Current dir is not synced to Seafile" >&2
+    exit 3
+fi
+
+
+set -- $ACCOUNT_INFO
+REPO=$1; shift
+TOKEN=$1; shift
+URL=$1; shift
+DIR_INSIDE_REPO="$@"
+
+# seafile internal link
+FULL_FILE_PATH="$DIR_INSIDE_REPO/$FILE_NAME"
+FULL_FILE_PATH_URLIFYED=${FULL_FILE_PATH// /%20}
+
+# seafile:// internal link
+echo "seafile://openfile?repo_id=${REPO}&path=${FULL_FILE_PATH_URLIFYED}"
+
+# web url
+if [ ${FILE_OR_DIR} == "f" ]; then
+    echo "${URL}/lib/${REPO}/file${FULL_FILE_PATH_URLIFYED}"
+else
+   # https://files.microtap.de/#common/lib/14e18d43-be9e-419d-97ff-2f188958b60c/WLAN-Key
+   echo "${URL}/#common/lib/${REPO}/${FULL_FILE_PATH_URLIFYED}"
+fi
+
+exit 0

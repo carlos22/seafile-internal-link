@@ -1,0 +1,16 @@
+#!/bin/bash
+
+for arg
+do
+    OUT=`seafile-internal-link "$arg" 2>&1`
+    if [ "$?" -eq 0 ]
+    then
+        OUT=${OUT//&/&amp;}
+        OUT=${OUT// /%20}
+	OUT=$(sed 's#\(seafile[^  ]*\)#Seafile Protocol-Link:\n<a href="&">&</a>\n#' <<< $OUT)
+	OUT=$(sed 's#\(http[^  ]*\)#Seafile Web-Link:\n<a href="&">&</a>#' <<< $OUT)
+	zenity --info --title="Internal link" --width 700 --text="$OUT"
+    else
+	zenity --error --title="Internal link" --text="$OUT"
+    fi
+done
