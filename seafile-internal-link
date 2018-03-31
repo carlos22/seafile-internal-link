@@ -99,8 +99,7 @@ echo "seafile://openfile?repo_id=${REPO}&path=${FULL_FILE_PATH_URLIFYED}"
 if [ ${FILE_OR_DIR} == "f" ]; then
     echo "${URL}/lib/${REPO}/file${FULL_FILE_PATH_URLIFYED}"
 else
-   # https://files.microtap.de/#common/lib/14e18d43-be9e-419d-97ff-2f188958b60c/WLAN-Key
-   echo "${URL}/#common/lib/${REPO}/${FULL_FILE_PATH_URLIFYED}"
+   echo "${URL}/#common/lib/${REPO}${FULL_FILE_PATH_URLIFYED}"
 fi
 
 exit 0
