@@ -1,0 +1,13 @@
+#!/bin/bash
+
+for arg
+do
+    OUT=`seafile-internal-link "$arg" 2>&1`
+    if [ "$?" -eq 0 ]
+    then
+        URL=$(echo "$OUT" | sed -n 2p)
+        xdg-open "$URL"
+    else
+	zenity --error --title="Internal link" --text="$OUT"
+    fi
+done

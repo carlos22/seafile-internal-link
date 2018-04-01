@@ -52,7 +52,10 @@ mkdir -p  ${TARGET} 2>&1 >/dev/null
     exit 2
 }
 
-FILE='nautilus-seafile-internal-link'
+FILES='nautilus-seafile-internal-link nautilus-seafile-open-in-browser'
+for FILE in $FILES
+do
 install --mode=555 "$FILE" "$TARGET" && {
     echo "$FILE installed for $USER"
 }
+done
